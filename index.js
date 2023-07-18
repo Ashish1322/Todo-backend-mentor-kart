@@ -5,14 +5,16 @@ const cors = require("cors")
 const User = require("./modals/User")
 const app = express()
 const bcrypt = require("bcrypt")
+const jwt = require("jsonwebtoken")
+
+// imporint middleware
+const {isLoggedIn} = require("./middlewares")
 
 // Adding Middlewares
 app.use(bodyParser.json())
 app.use(cors())
 
 // Creating Authentication Routes 
-
-
 app.post("/auth/signup",(req,res) => {
  
     const {name,email,gender,password} = req.body;
@@ -80,7 +82,13 @@ app.post("/auth/login",(req,res) => {
             // result == true
             if(result == true)
             {
-                return res.json({success: true, message:"Logged IN"})
+                const token = jwt.sign({
+                    id: user._id,
+                    email: user.email
+                },"5678ABC",{ expiresIn: '1h' })
+                
+                return res.json({success: true,token: token
+                 })
             }
             else
             {
@@ -94,6 +102,35 @@ app.post("/auth/login",(req,res) => {
     .catch( () => res.json({success: false, message:"Something Went Wrong!"}))
 
 
+})
+
+
+
+// Protected Routes
+app.get("/getTodos",isLoggedIn,(req,res) => {
+
+    // check token
+    User.findById(req.user.id)
+    .then(data => {
+        res.json({success:true, todos: data.todos})
+    })
+    .catch(err => res.json({success: false, message:"Something Went Wrong !"}))
+
+})
+
+app.post("/addtodo",isLoggedIn,(req,res) => {
+
+    const {title,description} = req.body;
+    const userId = req.user.id;
+
+    User.findById(userId)
+    .then(user => {
+        user.todos.push({title,description})
+        user.save()
+        .then(() => res.json({success: true, message:"Todo Added"}))
+        .catch(err => res.json({success: false,messaage:"Faile"}))
+    })
+    .catch(err => res.json({success: false, message:"Something Went Wrong !"}))
 })
 
 
