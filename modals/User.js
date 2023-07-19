@@ -28,6 +28,11 @@ var UsersSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    role: {
+        type: Number,
+        default: 0,
+        required: true
+    },
     todos: [
         {
             title: {

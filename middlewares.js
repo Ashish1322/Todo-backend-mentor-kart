@@ -16,4 +16,14 @@ const isLoggedIn = (req,res,next) => {
     }
 }
 
-module.exports = {isLoggedIn}
+const isAdmin = (req,res,next) => {
+    if(req.user && req.user.role == 1)
+    {
+        next();
+    }
+    else 
+    {
+        return res.json({success: false, messaage:"You don't have permission to access this route"})
+    }
+}
+module.exports = {isLoggedIn,isAdmin}

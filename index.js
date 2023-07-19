@@ -8,13 +8,79 @@ const bcrypt = require("bcrypt")
 const jwt = require("jsonwebtoken")
 
 // imporint middleware
-const {isLoggedIn} = require("./middlewares")
+const {isLoggedIn, isAdmin} = require("./middlewares")
 
 // Adding Middlewares
 app.use(bodyParser.json())
 app.use(cors())
 
-// Creating Authentication Routes 
+// *********************************  ADMIN ROUTES ************************
+
+
+// Admin Signup
+app.post("/auth/admin/signup",(req,res) => {
+ 
+    const {name,email,gender,password} = req.body;
+    // check data validity
+    if(name == undefined || gender == undefined || email == undefined || password==undefined)
+    {
+        return res.json({success: false,message:"Invalid Data"})
+    }
+    // check password
+    if(password.length < 8)
+    {
+        return res.json({success: false,message:"Password is not strong"})
+    }
+    // check if account already exists with given email
+    User.findOne({email: email })
+    .then( user => {
+        // if user already exits
+    
+        if(user)
+        {
+            return res.json({success:false,message:"Email Already in use"})
+        }
+        // if not we have to create
+        let newUser = new User({name: name,email: email,gender: gender,role: 1})
+
+        bcrypt.hash(password,10, (err,codedPassword) => {
+            if(err) 
+            {
+               return res.json({success: false, message:"Something Went Wrong!"})
+            }
+            // if no erro set passord
+            newUser.password = codedPassword;
+            newUser.save()
+            .then(user => {
+                return res.json({success: true, message:"Account Created",user: newUser})
+            })
+            .catch(err =>  res.json({success: false, message:"Something Went Wrong!"}))
+            
+        })
+
+       
+    })
+    .catch( () => res.json({success: false, message:"Something Went Wrong!"}))
+
+})
+
+
+app.delete("/admin/delete-user/:userId",isLoggedIn,isAdmin,(req,res) => {
+    User.findByIdAndDelete(req.params.userId)
+    .then(() => res.json({success: true, messaage:"User Deleted"}))
+    .catch(() => res.json({success: false, message:"Sometihng Went Wrong"}))
+})
+
+
+app.get("/admin/get-all-users",isLoggedIn,isAdmin, (req,res) => {
+    User.find()
+    .then( users => res.json({success: true, users}))
+})
+
+
+// ********************************* USER ROUTES ************************
+
+// 1.  User Signup
 app.post("/auth/signup",(req,res) => {
  
     const {name,email,gender,password} = req.body;
@@ -61,6 +127,7 @@ app.post("/auth/signup",(req,res) => {
 
 })
 
+// 2.  Login
 app.post("/auth/login",(req,res) => {
     const {email,password} = req.body;
     // chekc if values are valid
@@ -84,6 +151,7 @@ app.post("/auth/login",(req,res) => {
             {
                 const token = jwt.sign({
                     id: user._id,
+                    role: user.role,
                     email: user.email
                 },"5678ABC",{ expiresIn: '1h' })
                 
@@ -104,9 +172,7 @@ app.post("/auth/login",(req,res) => {
 
 })
 
-
-
-// Protected Routes
+// 3. Fetch all todos
 app.get("/getTodos",isLoggedIn,(req,res) => {
 
     // check token
@@ -118,6 +184,7 @@ app.get("/getTodos",isLoggedIn,(req,res) => {
 
 })
 
+// 4. Add Todo
 app.post("/addtodo",isLoggedIn,(req,res) => {
 
     const {title,description} = req.body;
@@ -128,11 +195,71 @@ app.post("/addtodo",isLoggedIn,(req,res) => {
         user.todos.push({title,description})
         user.save()
         .then(() => res.json({success: true, message:"Todo Added"}))
-        .catch(err => res.json({success: false,messaage:"Faile"}))
+        .catch(err => res.json({success: false,messaage:"Failed"}))
     })
     .catch(err => res.json({success: false, message:"Something Went Wrong !"}))
 })
 
+// 5. Edit Todo
+app.put("/update-todo/:todoId",isLoggedIn,(req,res) => {
+    const {title,description,completed} = req.body;
+    const todoId = req.params.todoId;
+
+    // find user by id
+    User.findById(req.user.id)
+    .then(user => {
+        // if user found then find the todo of that user
+        let updatedTodos = []
+        for(var index = 0 ; index < user.todos.length ; index++)
+        {
+            let todo = user.todos[index]
+            if(todo._id != todoId )
+            {
+                updatedTodos.push(todo)
+            }
+            else
+            {
+                todo["title"] = title;
+                todo["description"]  = description;
+                todo["completed"] = completed
+                updatedTodos.push(todo);
+
+            }
+        }
+        user.todos = updatedTodos;
+        user.save()
+        .then(() => res.json({success: true, messaage:"Todo Upadte"}))
+        .catch(err => res.json({success: false, message:err.message}))
+    })
+    .catch(err => res.json({success: false, message:err.message}))
+})
+
+
+// 6. Edit Todo
+app.delete("/delete-todo/:todoId",isLoggedIn,(req,res) => {
+
+    const todoId = req.params.todoId;
+
+    // find user by id
+    User.findById(req.user.id)
+    .then(user => {
+        // if user found then find the todo of that user
+        let updatedTodos = []
+        for(var index = 0 ; index < user.todos.length ; index++)
+        {
+            let todo = user.todos[index]
+            if(todo._id != todoId )
+            {
+                updatedTodos.push(todo)
+            }
+        }
+        user.todos = updatedTodos;
+        user.save()
+        .then(() => res.json({success: true, messaage:"Todo Deleted"}))
+        .catch(err => res.json({success: false, message:err.message}))
+    })
+    .catch(err => res.json({success: false, message:err.message}))
+})
 
 
 // connection to database
@@ -143,6 +270,7 @@ mongoose.connect("mongodb://127.0.0.1:27017/?directConnection=true&serverSelecti
 .catch(() => {
     console.log("Connection Failed")
 })
+
 
 // Running the express app
 const PORT = 3001
