@@ -16,6 +16,7 @@ app.use(cors())
 
 // *********************************  ADMIN ROUTES ************************
 
+app.get("/",(req,res) => res.send("Working"));
 
 // Admin Signup
 app.post("/auth/admin/signup",(req,res) => {
